@@ -9,6 +9,7 @@ This R Markdown file contains the EDA for the Kaggle competition [predicting Rus
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(shiny)
+library(dygraphs)
 ```
 
 Read in train data. It's has a lot of variables
@@ -48,12 +49,28 @@ renderPlot({
 })
 ```
 
+Feature generating function to be applied to both the training and test data
 
-```{r, message=FALSE}
-macro <- read.csv("macro.csv", stringsAsFactors = FALSE)
+```{r}
+generate_features <- function(df){
+  df$timestamp <- as.Date(df$timestamp)
+  df$day <- weekdays(df$timestamp)
+  df$month <- months(df$timestamp)
+  df
+}
 ```
 
 ```{r}
+train <- generate_features(train)
+test <- generate_features(test)
+```
 
+
+```{r, message=FALSE}
+#macro <- read.csv("macro.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+test <- read.csv("test.csv", stringsAsFactors = F)
 ```
 
