@@ -1,0 +1,250 @@
+---
+title: "Kaggle EDA"
+output: html_document
+runtime: shiny
+---
+
+This R Markdown file contains the EDA for the Kaggle competition [predicting Russian house prices](https://www.kaggle.com/c/sberbank-russian-housing-market#evaluation).
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(shiny)
+library(dygraphs)
+library(ggplot2)
+library(xgboost)
+library(dygraphs)
+library(lubridate)
+library(xts)
+library(Matrix)
+```
+
+
+Feature generating function to be applied to both the training and test data
+
+```{r}
+generate_features <- function(df){
+  
+  df$timestamp <- as.Date(df$timestamp)
+  df$day <- weekdays(df$timestamp)
+  df$month <- months(df$timestamp)
+  df$year_month <- df$timestamp %>% as.yearmon %>% as.Date
+
+  # generate features specifically for train/test df
+  if("gdp_quart" %in% names(df)){
+  
+    # aggregated rent price features
+    df$apt_rent_business <- macro[grep("room_bus",names(macro))] %>% rowMeans(na.rm = TRUE)
+    df$apt_rent_eco <- macro[grep("room_eco",names(macro))] %>% rowMeans(na.rm = TRUE)
+    
+  } else{
+    
+    df$volume <- rep(1, nrow(df))
+    df$month_vol <- with(df, ave(volume, year_month, FUN = function(x) sum(x)))
+    df$rel_floor <- df$floor / df$max_floor
+    df$rel_living <- df$life_sq / df$full_sq
+    df$rel_kitch <- df$kitch_sq / df$full_sq
+    
+    # convert categorical variables to dummies
+    df$culture_objects_top_25 <- ifelse(df$culture_objects_top_25 == "yes", 1,0)
+    df$thermal_power_plant_raion <- ifelse(df$thermal_power_plant_raion == "yes", 1,0)
+    df$oil_chemistry_raion <- ifelse(df$culture_objects_top_25 == "yes", 1,0)
+    df$radiation_raion <- ifelse(df$culture_objects_top_25 == "yes", 1,0)
+    df$railroad_terminal_raion <- ifelse(df$railroad_terminal_raion == "yes",1,0)
+    df$big_market_raion <- ifelse(df$big_market_raion == "yes",1,0)
+    df$nuclear_reactor_raion <- ifelse(df$nuclear_reactor_raion == "yes",1,0)
+    df$detention_facility_raion <- ifelse(df$detention_facility_raion == "yes",1,0)
+    df$incineration_raion <- ifelse(df$incineration_raion == "yes", 1, 0)
+    df$big_road1_1line <- ifelse(df$big_road1_1line == "yes", 1,0)
+    df$railroad_1line <- ifelse(df$railroad_1line == "yes", 1,0)
+    
+
+  }
+  
+  df
+}
+```
+
+Read in data
+
+```{r}
+train <- read.csv("train.csv", stringsAsFactors = FALSE)
+macro <- read.csv("macro.csv", stringsAsFactors = FALSE)
+test <- read.csv("test.csv", stringsAsFactors = FALSE)
+```
+
+Transform columns and generate new features
+
+```{r, message=FALSE}
+train <- generate_features(train)
+macro <- generate_features(macro)
+test <- generate_features(test)
+```
+
+### Analysis of time series
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+price <- train[c("timestamp", "price_doc")]
+
+series_shell <- seq(min(price$timestamp),
+                    max(price$timestamp), by = 1)
+series_shell <- data.frame("timestamp"=series_shell)
+
+price <- price %>%
+          group_by(timestamp) %>%
+          summarise_each(funs(mean(., na.rm=TRUE)))
+
+price$timestamp <- as.Date(price$timestamp)
+
+price_qnt <- quantile(price$price_doc, probs = 0.98)
+  
+price <- price %>% filter(price_doc < price_qnt)
+price <- full_join(series_shell, price)
+
+price_ts <- xts(price[,-1], 
+                order.by = price[,1])
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+volume <- train["timestamp"]
+volume$volume <- rep(1, nrow(volume))
+
+volume$timestamp <- as.Date(volume$timestamp)
+
+volume <- volume %>%
+            group_by(timestamp) %>%
+            summarise_each(funs(sum))
+
+volume <- full_join(series_shell, volume, by="timestamp")
+volume$timestamp <- as.Date(volume$timestamp,
+                            format="%Y-%m-%d")
+
+volume_ts <- xts(volume[,-1],
+                 order.by = volume[,1])
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+selectInput("macro", "select macro variable:", 
+          names(macro)[names(macro) != "timestamp"])
+
+selectInput("diff", "series difference lag:",
+            c(0,1,2), selected = 0)
+
+#selectInput("transform", "select transformation:",
+#            c("none","log","square root", "first #difference"), selected = "none")
+
+renderDygraph({
+selection_col <- names(macro)[names(macro) == input$macro]
+plot_array <- macro[c("timestamp", selection_col)]
+
+plot_array <- xts(plot_array[,-1],
+                  order.by = as.Date(plot_array[,1], "%Y-%m-%d"))
+
+if(input$diff %in% 1:2){
+  plot_array <- diff(plot_array, lag = input$diff)
+}
+
+plot_array <- cbind(price_ts, plot_array)
+dygraph(plot_array, main=paste("price_doc and",input$macro)) %>%
+  dyRangeSelector(height = 40,
+                      dateWindow = c("2011-07-01", "2015-9-01")) %>%
+  dySeries("..2", axis = "y2") %>%
+  dyRoller()
+})
+
+renderDygraph({
+  dygraph(cbind(price_ts, volume_ts), main="price_doc and volume") %>% dyRangeSelector() %>%
+    dySeries("..2", axis="y2") %>%
+    dyOptions(fillGraph=TRUE, strokeWidth = 1)
+})
+
+```
+
+
+
+### Histograms of numeric variables
+
+```{r, echo = FALSE}
+train_classes <- map_chr(train, class)
+train_numerics <- train_classes[train_classes %in% c("integer","numeric")] %>% names
+
+sliderInput("quantile", "select quantiles:", 
+            min = 0, max = 100, value = c(0, 98))
+
+renderPlot({
+  qnt <- as.numeric(quantile(train$price_doc, probs = input$quantile/100))
+  
+  train$price_doc[train$price_doc <= qnt] %>% 
+    hist(main="Histogram of price_doc")
+})
+
+selectInput("train_var", "select variable to compare with `price_doc`:", 
+          train_numerics[train_numerics != "id"])
+
+renderPlot({
+  index <- which(names(train) == input$train_var)
+  plot_data <- as.numeric(unlist(train[index]))
+  
+  qnt <- as.numeric(quantile(plot_data, probs = input$quantile/100,
+                             na.rm = TRUE))
+  
+  plot_data[plot_data <= qnt] %>% 
+    hist(main=paste("Histogram of",input$train_var))
+})
+
+renderPlot({
+  y_qnt <- as.numeric(quantile(train$price_doc, probs = input$quantile/100))
+  
+  y <- train$price_doc[train$price_doc <= y_qnt]
+
+  index <- which(names(train) == input$train_var)
+  plot_data <- as.numeric(unlist(train[index]))
+  
+  x <- plot_data[train$price_doc <= y_qnt]
+  
+  plot(x,y)
+})
+```
+
+### xgboost model
+
+Model use few macro variables, most listing-related variables, and some new features. The macro data has to be joined to the train and test data based on overlapping time stamps
+
+```{r}
+# selecting macro variables
+macro_preds <- macro[c("gdp_quart","ppi",
+                       "rent_price_4.room_bus",
+                       "rent_price_3room_bus",
+                       "rent_price_2room_bus",
+                       "rent_price_1room_bus",
+                       "rent_price_3room_bus",
+                       "rent_price_2room_bus",
+                       "rent_price_1room_bus",
+                       "apt_rent_business",
+                       "apt_rent_eco",
+                       "micex",
+                       "timestamp")]
+
+xgb_train_df <- train %>% select(-id)
+xgb_test_df <- test %>% select(-id)
+
+xgb_train_df <- full_join(xgb_train_df, macro_preds, by="timestamp") %>%
+                  select(-timestamp)
+xgb_test_df <- full_join(xgb_test_df, macro_preds, by="timestamp") %>%
+                  select(-timestamp)
+
+xgb_train_price <- xgb_train_df$price_doc
+xgb_train_df <- xgb_train_df %>% select(-price_doc) %>% as.matrix
+xgb_train_df <- as(xgb_train_df, "dgCMatrix")
+
+#xgb_test_df <- as.matrix(data.frame(xgb_test_df))
+#xgb_test_df <- as(xgb_test_df, "dgCMatrix")
+
+#boost1 <- xgboost(data = xgb_train_df, label = xgb_train_price, 
+#                 max_depth = 6, eta = 0.1, nrounds = 10)
+#                  #objective = "reg:linear")
+```
+
+
