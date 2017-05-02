@@ -4,7 +4,7 @@ output: html_document
 runtime: shiny
 ---
 
-This R Markdown file contains the EDA for the Kaggle competition [predicting Russian house prices](https://www.kaggle.com/c/sberbank-russian-housing-market#evaluation).
+This R Markdown file contains the EDA for the Kaggle competition [predicting Russian house prices](https://www.kaggle.com/c/sberbank-russian-housing-market#evaluation). Markdown source code is on [github](https://github.com/rampje/Russian-Housing-Market).
 
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -227,24 +227,84 @@ macro_preds <- macro[c("gdp_quart","ppi",
                        "micex",
                        "timestamp")]
 
-xgb_train_df <- train %>% select(-id)
-xgb_test_df <- test %>% select(-id)
+xgb_train_df <- train %>% select(-id, -ID_metro)
 
-xgb_train_df <- full_join(xgb_train_df, macro_preds, by="timestamp") %>%
+xgb_train_df <- left_join(xgb_train_df, macro_preds, by="timestamp") %>%
                   select(-timestamp)
-xgb_test_df <- full_join(xgb_test_df, macro_preds, by="timestamp") %>%
-                  select(-timestamp)
+
+
+
+
+
+xgb_train_df <- xgb_train_df %>% filter(!is.na(price_doc)) 
 
 xgb_train_price <- xgb_train_df$price_doc
-xgb_train_df <- xgb_train_df %>% select(-price_doc) %>% as.matrix
-xgb_train_df <- as(xgb_train_df, "dgCMatrix")
 
-#xgb_test_df <- as.matrix(data.frame(xgb_test_df))
-#xgb_test_df <- as(xgb_test_df, "dgCMatrix")
+xgb_train_matrix <- as.matrix(xgb_train_df %>% select(-price_doc))
 
-#boost1 <- xgboost(data = xgb_train_df, label = xgb_train_price, 
-#                 max_depth = 6, eta = 0.1, nrounds = 10)
-#                  #objective = "reg:linear")
+
+xgb_train_matrix <- as(xgb_train_matrix, "dgCMatrix")
+xgb_train_matrix <- xgb.DMatrix(xgb_train_matrix, label = xgb_train_price)
 ```
 
+```{r}
+glimpse(xgb_train_df)
+```
+
+Try a few tuning parmeters for xgboosted trees
+
+```{r, eval=FALSE}
+#set.seed(63)
+
+boost1 <- xgboost(data = xgb_train_matrix,
+                 max_depth = 15, eta = 0.05, nrounds = 100,
+                 objective = "reg:linear")
+
+```
+
+```{r, eval=FALSE}
+boost2 <- xgboost(data = xgb_train_matrix, 
+                  max_depth = 20, eta = 0.05, nrounds = 100,
+                  objective = "reg:linear")
+```
+
+
+the train rmse looks abyssmal
+
+```{r eval=FALSE}
+boost1
+boost2
+```
+
+
+Prepare test data and generate predictions
+
+```{r eval=FALSE}
+xgb_test_df <- test %>% select(-id, -ID_metro)
+xgb_test_df <- left_join(xgb_test_df, macro_preds, by = "timestamp") %>% select(-timestamp)
+
+xgb_test_matrix <- as.matrix(xgb_test_df)
+xgb_test_matrix <- as(xgb_test_matrix, "dgCMatrix")
+
+preds1 <- predict(boost1, xgb_test_matrix)
+preds2 <- predict(boost2, xgb_test_matrix)
+
+renderPlot(hist(preds1, main="Sanity check: histogram of 'boost1' predictions"))
+renderPlot(hist(preds2, main="Sanity check: histogram of 'boost2' predictions"))
+```
+
+My gut tells me *boost2* is probably the best submission... ¯\_(ツ)_/¯
+
+```{r eval=FALSE}
+submission <- data.frame(
+  id = test$id,
+  price_doc = preds2
+)
+
+head(submission)
+```
+
+```{r, eval=FALSE}
+write.csv(submission, "submission1.csv", row.names=F)
+```
 
