@@ -3,4 +3,8 @@ title: "Russian Housing Market"
 output: html_document
 ---
 
+<<<<<<< HEAD
 This repository contains the notebook and files for for the Kaggle competition [predicting Russian house prices](https://www.kaggle.com/c/sberbank-russian-housing-market#evaluation). The markdown file shiny app is [here](https://rampje.shinyapps.io/kaggle_eda/).
+=======
+This repository contains the notebook and files for for the Kaggle competition [predicting Russian house prices](https://www.kaggle.com/c/sberbank-russian-housing-market#evaluation). The markdown file shiny app is [here](https://github.com/rampje/Russian-Housing-Market).
+>>>>>>> d7ebbfa3845db70d98faa9673807294ba4ab5949
