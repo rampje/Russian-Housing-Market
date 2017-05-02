@@ -4,7 +4,7 @@ output: html_document
 runtime: shiny
 ---
 
-This R Markdown file contains the EDA for the Kaggle competition [predicting Russian house prices](https://www.kaggle.com/c/sberbank-russian-housing-market#evaluation). Markdown source code is on [github](https://github.com/rampje/Russian-Housing-Market).
+This R Markdown file contains the EDA  and model-fitting for the Kaggle competition [predicting Russian house prices](https://www.kaggle.com/c/sberbank-russian-housing-market#evaluation). Markdown source code is on [github](https://github.com/rampje/Russian-Housing-Market).
 
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
