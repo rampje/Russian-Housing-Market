@@ -7,7 +7,7 @@ test <- read.csv("test.csv")
 macro <- read.csv("macro.csv")
 sample_submission <- read.csv("sample_submission.csv")
 
-id_test = test$id
+id_test <- test$id
 
 y_train <- train$price_doc
 
@@ -29,14 +29,14 @@ for (f in features) {
   }
 }
 
-x_train = train_test[1:len_train,]
-x_test = train_test[(len_train+1):(len_train+len_test),]
+x_train <- train_test[1:len_train,]
+x_test <- train_test[(len_train+1):(len_train+len_test),]
 
-dtrain = xgb.DMatrix(as.matrix(x_train), label=y_train)
-dtest = xgb.DMatrix(as.matrix(x_test))
+dtrain <- xgb.DMatrix(as.matrix(x_train), label=y_train)
+dtest <- xgb.DMatrix(as.matrix(x_test))
 
 
-xgb_params = list(
+xgb_params <- list(
   seed = 0,
   colsample_bytree = 0.7,
   subsample = 0.7,
@@ -59,9 +59,9 @@ xgb_params = list(
 
 #best_nrounds = res$best_iteration
 
-best_nrounds = 250
+best_nrounds <- 10
 
-gbdt = xgboost(params = xgb_params, 
+gbdt <- xgboost(params = xgb_params, 
                  data = dtrain, 
                  nrounds = best_nrounds)
 

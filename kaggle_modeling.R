@@ -1,0 +1,100 @@
+### xgboost model
+
+Model use few macro variables, most listing-related variables, and some new features. The macro data has to be joined to the train and test data based on overlapping time stamps
+
+```{r}
+# selecting macro variables
+macro_preds <- macro[c("gdp_quart","ppi",
+                       "rent_price_4.room_bus",
+                       "rent_price_3room_bus",
+                       "rent_price_2room_bus",
+                       "rent_price_1room_bus",
+                       "rent_price_3room_bus",
+                       "rent_price_2room_bus",
+                       "rent_price_1room_bus",
+                       "apt_rent_business",
+                       "apt_rent_eco",
+                       "micex",
+                       "timestamp")]
+
+xgb_train_df <- train %>% select(-id, -ID_metro)
+
+xgb_train_df <- left_join(xgb_train_df, macro_preds, by="timestamp") %>%
+  select(-timestamp)
+
+
+
+
+
+xgb_train_df <- xgb_train_df %>% filter(!is.na(price_doc)) 
+
+xgb_train_price <- xgb_train_df$price_doc
+
+xgb_train_matrix <- as.matrix(xgb_train_df %>% select(-price_doc))
+
+
+xgb_train_matrix <- as(xgb_train_matrix, "dgCMatrix")
+xgb_train_matrix <- xgb.DMatrix(xgb_train_matrix, label = xgb_train_price)
+```
+
+```{r}
+glimpse(xgb_train_df)
+```
+
+Try a few tuning parmeters for xgboosted trees
+
+```{r, eval=FALSE}
+#set.seed(63)
+
+boost1 <- xgboost(data = xgb_train_matrix,
+                  max_depth = 15, eta = 0.05, nrounds = 100,
+                  objective = "reg:linear")
+
+```
+
+```{r, eval=FALSE}
+boost2 <- xgboost(data = xgb_train_matrix, 
+                  max_depth = 20, eta = 0.05, nrounds = 100,
+                  objective = "reg:linear")
+```
+
+
+the train rmse looks abyssmal
+
+```{r eval=FALSE}
+boost1
+boost2
+```
+
+
+Prepare test data and generate predictions
+
+```{r eval=FALSE}
+xgb_test_df <- test %>% select(-id, -ID_metro)
+xgb_test_df <- left_join(xgb_test_df, macro_preds, by = "timestamp") %>% select(-timestamp)
+
+xgb_test_matrix <- as.matrix(xgb_test_df)
+xgb_test_matrix <- as(xgb_test_matrix, "dgCMatrix")
+
+preds1 <- predict(boost1, xgb_test_matrix)
+preds2 <- predict(boost2, xgb_test_matrix)
+
+renderPlot(hist(preds1, main="Sanity check: histogram of 'boost1' predictions"))
+renderPlot(hist(preds2, main="Sanity check: histogram of 'boost2' predictions"))
+```
+
+My gut tells me *boost2* is probably the best submission... ¯\_(ツ)_/¯
+
+```{r eval=FALSE}
+submission <- data.frame(
+  id = test$id,
+  price_doc = preds2
+)
+
+head(submission)
+```
+
+```{r, eval=FALSE}
+write.csv(submission, "submission1.csv", row.names=F)
+```
+
