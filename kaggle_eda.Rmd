@@ -16,6 +16,7 @@ library(dygraphs)
 library(lubridate)
 library(xts)
 library(Matrix)
+library(DT)
 ```
 
 
@@ -82,8 +83,23 @@ test <- generate_features(test)
 
 ### Analysis of time series
 
-```{r, message=FALSE, warning=FALSE, include=FALSE}
-price <- train[c("timestamp", "price_doc")]
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+selectInput("macro", "select macro variable:", 
+          names(macro)[names(macro) != "timestamp"])
+
+selectInput("region", "select region:",
+            c("all",sort(unique(train$sub_area))))
+
+
+renderDygraph({
+  
+  if(input$region != "all"){
+    price <- train %>% filter(sub_area == input$region)
+  } else{
+      price <- train
+    }
+  
+  price <- price[c("timestamp", "price_doc")]
 
 series_shell <- seq(min(price$timestamp),
                     max(price$timestamp), by = 1)
@@ -102,19 +118,24 @@ price <- full_join(series_shell, price)
 
 price_ts <- xts(price[,-1], 
                 order.by = price[,1])
-
-```
-
-
-```{r, message=FALSE, warning=FALSE, include=FALSE}
-volume <- train["timestamp"]
+  
+  
+if(input$region != "all"){
+  volume <- train %>% filter(sub_area == input$region)
+} else {
+    volume <- train
+  }
+  
+volume <- volume["timestamp"]
 volume$volume <- rep(1, nrow(volume))
 
-volume$timestamp <- as.Date(volume$timestamp)
+
 
 volume <- volume %>%
             group_by(timestamp) %>%
             summarise_each(funs(sum))
+
+volume$timestamp <- as.Date(volume$timestamp)
 
 volume <- full_join(series_shell, volume, by="timestamp")
 volume$timestamp <- as.Date(volume$timestamp,
@@ -122,29 +143,16 @@ volume$timestamp <- as.Date(volume$timestamp,
 
 volume_ts <- xts(volume[,-1],
                  order.by = volume[,1])
-```
 
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-selectInput("macro", "select macro variable:", 
-          names(macro)[names(macro) != "timestamp"])
-
-selectInput("diff", "series difference lag:",
-            c(0,1,2), selected = 0)
-
-#selectInput("transform", "select transformation:",
-#            c("none","log","square root", "first #difference"), selected = "none")
-
-renderDygraph({
 selection_col <- names(macro)[names(macro) == input$macro]
-plot_array <- macro[c("timestamp", selection_col)]
 
+
+plot_array <- macro[c("timestamp", selection_col)]
+  
 plot_array <- xts(plot_array[,-1],
                   order.by = as.Date(plot_array[,1], "%Y-%m-%d"))
 
-if(input$diff %in% 1:2){
-  plot_array <- diff(plot_array, lag = input$diff)
-}
 
 plot_array <- cbind(price_ts, plot_array)
 dygraph(plot_array, main=paste("price_doc and",input$macro)) %>%
@@ -155,6 +163,60 @@ dygraph(plot_array, main=paste("price_doc and",input$macro)) %>%
 })
 
 renderDygraph({
+  
+    if(input$region != "all"){
+    price <- train %>% filter(sub_area == input$region)
+  } else{
+      price <- train
+    }
+  
+  price <- price[c("timestamp", "price_doc")]
+
+series_shell <- seq(min(price$timestamp),
+                    max(price$timestamp), by = 1)
+series_shell <- data.frame("timestamp"=series_shell)
+
+price <- price %>%
+          group_by(timestamp) %>%
+          summarise_each(funs(mean(., na.rm=TRUE)))
+
+price$timestamp <- as.Date(price$timestamp)
+
+price_qnt <- quantile(price$price_doc, probs = 0.98)
+  
+price <- price %>% filter(price_doc < price_qnt)
+price <- full_join(series_shell, price)
+
+price_ts <- xts(price[,-1], 
+                order.by = price[,1])
+  
+  
+if(input$region != "all"){
+  volume <- train %>% filter(sub_area == input$region)
+} else {
+    volume <- train
+  }
+  
+volume <- volume["timestamp"]
+volume$volume <- rep(1, nrow(volume))
+
+
+
+volume <- volume %>%
+            group_by(timestamp) %>%
+            summarise_each(funs(sum))
+
+volume$timestamp <- as.Date(volume$timestamp)
+
+volume <- full_join(series_shell, volume, by="timestamp")
+volume$timestamp <- as.Date(volume$timestamp,
+                            format="%Y-%m-%d")
+
+volume_ts <- xts(volume[,-1],
+                 order.by = volume[,1])
+  
+  
+  
   dygraph(cbind(price_ts, volume_ts), main="price_doc and volume") %>% dyRangeSelector() %>%
     dySeries("..2", axis="y2") %>%
     dyOptions(fillGraph=TRUE, strokeWidth = 1)
@@ -162,6 +224,17 @@ renderDygraph({
 
 ```
 
+### Frequency of *sub_area* in train data set:
+
+This table may provide guidance for *sub_region* flag selection. Sub-regions with very small numbers of observations may need to be grouped together.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+train$sub_area %>%
+  table %>%
+  sort(decreasing = TRUE) %>% 
+  data.frame %>%
+  datatable(rownames = F)
+```
 
 
 ### Histograms of numeric variables
@@ -207,4 +280,7 @@ renderPlot({
   plot(x,y)
 })
 ```
+<<<<<<< HEAD
 
+=======
+>>>>>>> development
