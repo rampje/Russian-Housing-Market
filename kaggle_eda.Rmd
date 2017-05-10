@@ -70,7 +70,7 @@ Read in data
 ```{r}
 train <- read.csv("train.csv", stringsAsFactors = FALSE)
 macro <- read.csv("macro.csv", stringsAsFactors = FALSE)
-test <- read.csv("test.csv", stringsAsFactors = FALSE)
+#test <- read.csv("test.csv", stringsAsFactors = FALSE)
 ```
 
 Transform columns and generate new features
@@ -78,7 +78,7 @@ Transform columns and generate new features
 ```{r, message=FALSE}
 train <- generate_features(train)
 macro <- generate_features(macro)
-test <- generate_features(test)
+#test <- generate_features(test)
 ```
 
 ### Analysis of time series
@@ -280,7 +280,3 @@ renderPlot({
   plot(x,y)
 })
 ```
-<<<<<<< HEAD
-
-=======
->>>>>>> development

@@ -3,8 +3,8 @@ title: kaggle_eda
 account: rampje
 server: shinyapps.io
 appId: 176934
-bundleId: 811404
+bundleId: 822301
 url: https://rampje.shinyapps.io/kaggle_eda/
-when: 1493703280.25119
+when: 1494420584.65452
 asMultiple: FALSE
 asStatic: FALSE
