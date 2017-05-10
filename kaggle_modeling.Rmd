@@ -1,3 +1,9 @@
+---
+title: "Kaggle Modeling"
+author: "Warner Rose"
+date: "May 9, 2017"
+output: html_document
+---
 ### xgboost model
 
 Model use few macro variables, most listing-related variables, and some new features. The macro data has to be joined to the train and test data based on overlapping time stamps
@@ -97,4 +103,3 @@ head(submission)
 ```{r, eval=FALSE}
 write.csv(submission, "submission1.csv", row.names=F)
 ```
-
